@@ -22,7 +22,7 @@
     {% for m in members %}
     <tr>
       <td>{{ m.name }}</td>
-      <td><code>{{ m.rfid_uid }}</code></td>
+      <td><code>{{ m.rfid_uid | uid_fmt }}</code></td>
       <td>€{{ "%.2f"|format(m.balance_cents / 100) }}</td>
       <td>{{ "✓" if m.active else "–" }}</td>
       <td style="display:flex;gap:0.5rem">

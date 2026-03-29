@@ -60,6 +60,24 @@ class CloudProvider(BaseSyncProvider):
         location = Setting.get("BAR_LOCATION")   or cfg.get("BAR_LOCATION", "Bar")
         return url.rstrip("/"), api_key, location
 
+    def send_heartbeat(self):
+        try:
+            import requests as _requests
+        except ImportError:
+            return
+        url, api_key, location = self._settings()
+        if not url or not api_key:
+            return
+        try:
+            _requests.post(
+                f"{url}/api/v1/heartbeat",
+                json={"bar_location": location},
+                headers={"X-Api-Key": api_key},
+                timeout=5,
+            )
+        except Exception:
+            pass  # heartbeat is best-effort
+
     def push_transactions(self, records: list[dict]) -> list[int]:
         try:
             import requests as _requests
@@ -166,6 +184,8 @@ class SyncService:
     def _run_sync(self):
         with self._lock:
             with self._app.app_context():
+                if isinstance(self._provider, CloudProvider):
+                    self._provider.send_heartbeat()
                 self._sync_with_result(self._provider)
 
     def _sync_with_result(self, provider: BaseSyncProvider) -> dict:
@@ -193,7 +213,8 @@ class SyncService:
             db.session.commit()
             self._last_sync  = datetime.now(timezone.utc)
             self._last_count = len(synced_ids)
-            msg = f"{len(synced_ids)} von {len(records)} Buchungen übertragen."
+            n, total = len(synced_ids), len(records)
+            msg = f"{n} von {total} {'Buchung' if n == 1 else 'Buchungen'} übertragen."
             print(f"[Sync] {msg}")
             return {"ok": True, "sent": len(records), "accepted": len(synced_ids), "msg": msg}
         else:

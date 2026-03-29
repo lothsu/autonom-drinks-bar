@@ -12,7 +12,7 @@
     <tbody>
     {% for row in uid_rows %}
     <tr>
-      <td><code>{{ row.uid }}</code></td>
+      <td><code>{{ row.uid | uid_fmt }}</code></td>
       <td>{{ row.count }}</td>
       <td>€{{ "%.2f"|format(row.total_cents / 100) }}</td>
     </tr>
@@ -32,7 +32,7 @@
     <tr>
       <td>{{ tx.id }}</td>
       <td style="white-space:nowrap">{{ tx.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
-      <td><code>{{ tx.rfid_uid }}</code></td>
+      <td><code>{{ tx.rfid_uid | uid_fmt }}</code></td>
       <td>
         {% for item in tx.items %}
           {{ item.qty }}× {{ item.name }}{% if not loop.last %}, {% endif %}

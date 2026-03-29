@@ -53,7 +53,6 @@ def index():
     return render_template(
         "admin/index.html",
         total_revenue=total_revenue / 100,
-        member_count=Member.query.filter_by(active=True).count(),
         transaction_count=Transaction.query.count(),
     )
 

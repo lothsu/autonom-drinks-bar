@@ -53,7 +53,7 @@
               style="font-weight: bold; color: {{ 'var(--red)' if unsynced > 0 else 'green' }}">
           {{ unsynced }}
         </span>
-        Buchungen
+        {{ "Buchung" if unsynced == 1 else "Buchungen" }}
       </td>
     </tr>
     <tr>
@@ -61,7 +61,7 @@
       <td id="last-sync-cell">
         {% if sync_status.last_sync %}
           {{ sync_status.last_sync[:19]|replace("T", " ") }} UTC
-          ({{ sync_status.last_count }} Buchungen)
+          ({{ sync_status.last_count }} {{ "Buchung" if sync_status.last_count == 1 else "Buchungen" }})
         {% else %}
           –
         {% endif %}
@@ -122,11 +122,12 @@
     msg.textContent = 'Verbinde mit Cloud…';
 
     // Animate to 40% quickly, then stall — real progress arrives with response
-    setTimeout(() => { fill.style.width = '40%'; }, 80);
+    const fillTimer = setTimeout(() => { fill.style.width = '40%'; }, 80);
 
     fetch("{{ url_for('admin.settings_sync') }}", { method: 'POST' })
       .then(r => r.json())
       .then(d => {
+        clearTimeout(fillTimer);
         fill.style.width = '100%';
         fill.style.background = d.ok ? '#2a9d2a' : 'var(--red)';
         msg.style.color = d.ok ? '#1a6e1a' : 'var(--red)';
@@ -145,6 +146,7 @@
         btn.textContent = 'Jetzt synchronisieren';
       })
       .catch(err => {
+        clearTimeout(fillTimer);
         fill.style.width = '100%';
         fill.style.background = 'var(--red)';
         msg.style.color = 'var(--red)';
