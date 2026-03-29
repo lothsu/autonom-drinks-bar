@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin – {% block title %}{% endblock %}</title>
+  <style>
+    :root {
+      --red:     #dd3333;
+      --red-dk:  #b32929;
+      --nav-bg:  #111111;
+      --page-bg: #f2f2f2;
+      --card-bg: #ffffff;
+      --border:  #e0e0e0;
+      --text:    #1a1a1a;
+      --text-lo: #666666;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: var(--page-bg); color: var(--text); }
+    nav { background: var(--nav-bg); color: #eee; padding: 0.8rem 2rem; display: flex; gap: 1.5rem; align-items: center; }
+    nav a { color: #aaa; text-decoration: none; font-size: 0.95rem; transition: color 0.15s; }
+    nav a:hover, nav a.active { color: #fff; }
+    nav .brand { font-weight: bold; color: var(--red); margin-right: auto; letter-spacing: 0.02em; }
+    main { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { margin-bottom: 1.5rem; }
+    .card { background: var(--card-bg); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); }
+    th { background: #f7f7f7; font-size: 0.85rem; color: var(--text-lo); }
+    .btn { display: inline-block; padding: 0.4rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem; text-decoration: none; transition: background 0.15s; }
+    .btn-primary { background: var(--red); color: #fff; }
+    .btn-primary:hover { background: var(--red-dk); }
+    .btn-secondary { background: #e0e0e0; color: #333; }
+    .btn-secondary:hover { background: #d0d0d0; }
+    .btn-sm { padding: 0.25rem 0.7rem; font-size: 0.8rem; }
+    input, select { border: 1px solid #ccc; border-radius: 6px; padding: 0.4rem 0.7rem; font-size: 0.95rem; width: 100%; }
+    label { display: block; font-size: 0.88rem; color: var(--text-lo); margin-bottom: 0.3rem; }
+    .form-group { margin-bottom: 1rem; }
+    code { background: #f0f0f0; border-radius: 4px; padding: 0.1em 0.4em; font-size: 0.9em; }
+    .flash { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 0.7rem 1rem; margin-bottom: 1rem; }
+    .stats { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+    .stat { background: var(--card-bg); border-radius: 10px; padding: 1.2rem 1.5rem; flex: 1; box-shadow: 0 1px 4px rgba(0,0,0,.08); border-left: 4px solid var(--red); }
+    .stat .value { font-size: 2rem; font-weight: bold; color: var(--red); }
+    .stat .label { color: var(--text-lo); font-size: 0.9rem; margin-top: 0.2rem; }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="brand">⚓ Bar Admin</span>
+  <a href="{{ url_for('admin.index') }}">Übersicht</a>
+  <a href="{{ url_for('admin.drinks') }}">Getränke</a>
+  <a href="{{ url_for('admin.analytics') }}">Auswertung</a>
+  <a href="{{ url_for('admin.charts') }}">Grafiken</a>
+  <a href="{{ url_for('admin.settings') }}">Einstellungen</a>
+  <a href="{{ url_for('kiosk.index') }}" target="_blank">Kiosk ↗</a>
+  <a href="{{ url_for('admin.logout') }}">Abmelden</a>
+</nav>
+<main>
+  {% with msgs = get_flashed_messages() %}
+    {% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

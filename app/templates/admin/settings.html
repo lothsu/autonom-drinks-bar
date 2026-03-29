@@ -1,0 +1,157 @@
+{% extends "admin/base.html" %}
+{% block title %}Einstellungen{% endblock %}
+{% block content %}
+<h1>Einstellungen</h1>
+
+<div class="card">
+  <h2 style="margin-bottom: 1.2rem;">Cloud-Synchronisation</h2>
+
+  <form method="post" action="{{ url_for('admin.settings_save') }}">
+    <div class="form-group">
+      <label for="CLOUD_URL">Cloud URL</label>
+      <input type="text" id="CLOUD_URL" name="CLOUD_URL"
+             value="{{ values.CLOUD_URL }}"
+             placeholder="https://mein-cloud-server.de">
+    </div>
+
+    <div class="form-group">
+      <label for="CLOUD_API_KEY">API-Key</label>
+      <div style="display: flex; gap: 0.5rem;">
+        <input type="password" id="CLOUD_API_KEY" name="CLOUD_API_KEY"
+               value="{{ values.CLOUD_API_KEY }}"
+               placeholder="Geheimen API-Key eingeben"
+               style="flex: 1;">
+        <button type="button" onclick="toggleKey()" class="btn btn-secondary"
+                style="white-space: nowrap; width: auto;">Anzeigen</button>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 1.4rem;">
+      <label for="BAR_LOCATION">Bar-Name (Standort)</label>
+      <input type="text" id="BAR_LOCATION" name="BAR_LOCATION"
+             value="{{ values.BAR_LOCATION }}"
+             placeholder="z. B. Vereinsheim">
+    </div>
+
+    <div style="display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center;">
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      <button type="button" onclick="testConnection()" class="btn btn-secondary">
+        Verbindung testen
+      </button>
+      <span id="test-result" style="font-size: 0.88rem;"></span>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-bottom: 1rem;">Sync-Status</h2>
+  <table style="width: auto; min-width: 280px;">
+    <tr>
+      <th style="text-align: left; padding-right: 2rem;">Nicht synchronisiert</th>
+      <td>
+        <span id="unsynced-count"
+              style="font-weight: bold; color: {{ 'var(--red)' if unsynced > 0 else 'green' }}">
+          {{ unsynced }}
+        </span>
+        Buchungen
+      </td>
+    </tr>
+    <tr>
+      <th style="text-align: left;">Letzter Sync</th>
+      <td id="last-sync-cell">
+        {% if sync_status.last_sync %}
+          {{ sync_status.last_sync[:19]|replace("T", " ") }} UTC
+          ({{ sync_status.last_count }} Buchungen)
+        {% else %}
+          –
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+
+  {# Sync action button + status bar #}
+  <div style="margin-top: 1.2rem;">
+    <button id="sync-btn" onclick="runSync()" class="btn btn-primary">
+      Jetzt synchronisieren
+    </button>
+
+    <div id="sync-bar" style="display: none; margin-top: 1rem;">
+      <div id="sync-bar-track"
+           style="height: 6px; border-radius: 3px; background: #e0e0e0; overflow: hidden; margin-bottom: 0.6rem;">
+        <div id="sync-bar-fill"
+             style="height: 100%; width: 0%; border-radius: 3px;
+                    background: var(--red); transition: width 0.3s ease;"></div>
+      </div>
+      <div id="sync-msg" style="font-size: 0.9rem;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleKey() {
+    const inp = document.getElementById('CLOUD_API_KEY');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  }
+
+  function testConnection() {
+    const el = document.getElementById('test-result');
+    el.style.color = '#888';
+    el.textContent = 'Verbinde…';
+    fetch("{{ url_for('admin.settings_test') }}", { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        el.style.color = d.ok ? 'green' : 'var(--red)';
+        el.textContent = (d.ok ? '✓ ' : '✗ ') + d.msg;
+      })
+      .catch(() => { el.style.color = 'var(--red)'; el.textContent = '✗ Netzwerkfehler'; });
+  }
+
+  function runSync() {
+    const btn  = document.getElementById('sync-btn');
+    const bar  = document.getElementById('sync-bar');
+    const fill = document.getElementById('sync-bar-fill');
+    const msg  = document.getElementById('sync-msg');
+
+    // Show bar, animate to 40% while waiting
+    btn.disabled = true;
+    btn.textContent = 'Synchronisiere…';
+    bar.style.display = 'block';
+    fill.style.background = 'var(--red)';
+    fill.style.width = '0%';
+    msg.style.color = '#888';
+    msg.textContent = 'Verbinde mit Cloud…';
+
+    // Animate to 40% quickly, then stall — real progress arrives with response
+    setTimeout(() => { fill.style.width = '40%'; }, 80);
+
+    fetch("{{ url_for('admin.settings_sync') }}", { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        fill.style.width = '100%';
+        fill.style.background = d.ok ? '#2a9d2a' : 'var(--red)';
+        msg.style.color = d.ok ? '#1a6e1a' : 'var(--red)';
+        msg.innerHTML = (d.ok ? '✓ ' : '✗ ') + d.msg;
+
+        // Update the "unsynced" counter live
+        if (d.ok && typeof d.sent !== 'undefined') {
+          const el = document.getElementById('unsynced-count');
+          const prev = parseInt(el.textContent) || 0;
+          const remaining = Math.max(0, prev - d.accepted);
+          el.textContent = remaining;
+          el.style.color = remaining > 0 ? 'var(--red)' : 'green';
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Jetzt synchronisieren';
+      })
+      .catch(err => {
+        fill.style.width = '100%';
+        fill.style.background = 'var(--red)';
+        msg.style.color = 'var(--red)';
+        msg.textContent = '✗ Netzwerkfehler: ' + err;
+        btn.disabled = false;
+        btn.textContent = 'Jetzt synchronisieren';
+      });
+  }
+</script>
+{% endblock %}

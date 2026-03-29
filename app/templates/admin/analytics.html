@@ -1,0 +1,48 @@
+{% extends "admin/base.html" %}
+{% block title %}Auswertung{% endblock %}
+{% block content %}
+<h1>Auswertung</h1>
+
+<div class="card">
+  <h2 style="margin-bottom:1rem">Statistik nach UID</h2>
+  <table>
+    <thead>
+      <tr><th>UID</th><th>Buchungen</th><th>Gesamt</th></tr>
+    </thead>
+    <tbody>
+    {% for row in uid_rows %}
+    <tr>
+      <td><code>{{ row.uid }}</code></td>
+      <td>{{ row.count }}</td>
+      <td>€{{ "%.2f"|format(row.total_cents / 100) }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 style="margin:1.5rem 0 1rem">Buchungen <small style="font-size:0.7em;color:#999">(letzte 100)</small></h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Zeitpunkt</th><th>UID</th><th>Artikel</th><th>Gesamt</th><th>Sync</th></tr>
+    </thead>
+    <tbody>
+    {% for tx in transactions %}
+    <tr>
+      <td>{{ tx.id }}</td>
+      <td style="white-space:nowrap">{{ tx.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+      <td><code>{{ tx.rfid_uid }}</code></td>
+      <td>
+        {% for item in tx.items %}
+          {{ item.qty }}× {{ item.name }}{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </td>
+      <td>€{{ "%.2f"|format(tx.total_cents / 100) }}</td>
+      <td>{{ "✓" if tx.synced else "…" }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

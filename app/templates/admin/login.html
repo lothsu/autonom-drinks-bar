@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Login</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: sans-serif; background: #111111; display: flex; height: 100vh; justify-content: center; align-items: center; }
+    .box { background: #fff; border-radius: 12px; padding: 2.5rem; width: 320px; text-align: center; box-shadow: 0 4px 24px rgba(0,0,0,.4); }
+    h1 { margin-bottom: 1.5rem; color: #1a1a1a; }
+    input[type=password] { width: 100%; padding: 0.7rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
+    button { width: 100%; padding: 0.8rem; background: #dd3333; color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; transition: background 0.15s; }
+    button:hover { background: #b32929; }
+    .flash { color: #c00; margin-bottom: 0.8rem; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+<div class="box">
+  <h1>⚓ Admin</h1>
+  {% with msgs = get_flashed_messages() %}
+    {% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  <form method="post">
+    <input type="password" name="password" placeholder="Passwort" autofocus>
+    <button type="submit">Anmelden</button>
+  </form>
+</div>
+</body>
+</html>

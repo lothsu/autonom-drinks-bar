@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bar</title>
+  <style>
+    :root {
+      --red:     #dd3333;
+      --red-dk:  #b32929;
+      --bg:      #0d0d0d;
+      --surface: #171717;
+      --card:    #1f1f1f;
+      --border:  #2a2a2a;
+      --muted:   #2a2a2a;
+      --text:    #eeeeee;
+      --text-lo: #999999;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    header { padding: 1rem 2rem; background: var(--surface); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    header h1 { font-size: 1.5rem; }
+    #total { font-size: 1.4rem; font-weight: bold; color: var(--red); }
+    footer { background: var(--surface); padding: 1.2rem 2rem; display: flex; gap: 1rem; align-items: center; flex-shrink: 0; }
+    #drinks-grid { display: grid; gap: 1rem; padding: 1.5rem; flex: 1 1 0; min-height: 0; align-content: center; justify-content: center; overflow: hidden; }
+    .drink-btn { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 1.2rem; cursor: pointer; text-align: center; user-select: none; transition: background 0.15s, border-color 0.15s; display: flex; flex-direction: column; justify-content: center; align-items: center; aspect-ratio: 1/1; }
+    .drink-btn:active { background: var(--border); }
+    .drink-btn.in-cart { border-color: var(--red); }
+    .drink-btn .name { font-size: 1.1rem; font-weight: bold; overflow-wrap: break-word; word-break: break-word; hyphens: auto; }
+    .drink-btn .price { margin-top: 0.4rem; color: var(--text-lo); font-size: 0.95rem; }
+    .drink-btn .qty-badge { margin-top: 0.5rem; background: var(--red); color: #fff; border-radius: 999px; display: inline-block; padding: 0.1rem 0.7rem; font-size: 0.85rem; }
+    #checkout-btn { background: var(--red); color: #fff; border: none; border-radius: 12px; padding: 1.4rem 2rem; font-size: 1.4rem; font-weight: bold; cursor: pointer; flex: 1; letter-spacing: 0.03em; transition: background 0.15s; }
+    #checkout-btn:hover:not(:disabled) { background: var(--red-dk); }
+    #checkout-btn:disabled { opacity: 0.4; cursor: default; }
+    #clear-btn { background: var(--muted); color: var(--text); border: none; border-radius: 12px; padding: 1.4rem 1.8rem; font-size: 1rem; cursor: pointer; align-self: stretch; }
+
+    /* Modal */
+    #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); justify-content: center; align-items: center; }
+    #modal.show { display: flex; }
+    #modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; text-align: center; max-width: 380px; width: 90%; }
+    #modal-box h2 { margin-bottom: 1rem; }
+    #modal-status { font-size: 1rem; color: var(--text-lo); margin-bottom: 1.5rem; min-height: 2rem; }
+    #modal-cancel { background: var(--muted); color: var(--text); border: none; border-radius: 8px; padding: 0.8rem 2rem; font-size: 1rem; cursor: pointer; }
+
+    /* History button */
+    #history-btn { background: var(--muted); color: var(--text); border: none; border-radius: 12px; padding: 1.4rem 1.8rem; font-size: 1rem; cursor: pointer; align-self: stretch; }
+
+    /* History modal */
+    #history-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); justify-content: center; align-items: center; z-index: 10; }
+    #history-modal.show { display: flex; }
+    #history-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; max-width: 480px; width: 95%; max-height: 90vh; overflow-y: auto; }
+    #history-box h2 { margin-bottom: 0.5rem; }
+    #history-subtitle { color: var(--text-lo); font-size: 0.9rem; margin-bottom: 1.2rem; }
+    .tx-card { background: var(--surface); border-radius: 10px; padding: 1rem; margin-bottom: 0.8rem; border: 1px solid var(--border); }
+    .tx-card.latest { border-color: var(--red); }
+    .tx-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+    .tx-meta .tx-time { font-size: 0.8rem; color: var(--text-lo); }
+    .tx-meta .tx-total { font-weight: bold; color: var(--red); }
+    .tx-items { font-size: 0.85rem; color: #ccc; }
+    .edit-btn { margin-top: 0.6rem; background: var(--red); color: #fff; border: none; border-radius: 6px; padding: 0.4rem 1.2rem; cursor: pointer; font-size: 0.9rem; }
+
+    /* Edit view inside history box */
+    #edit-section { display: none; }
+    #edit-section h3 { margin-bottom: 1rem; }
+    .edit-row { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+    .edit-row:last-child { border-bottom: none; }
+    .edit-row .item-name { flex: 1; }
+    .qty-ctrl { display: flex; align-items: center; gap: 0.5rem; }
+    .qty-ctrl button { background: var(--border); color: var(--text); border: none; border-radius: 6px; width: 2rem; height: 2rem; font-size: 1.1rem; cursor: pointer; }
+    .qty-ctrl span { min-width: 1.5rem; text-align: center; }
+    #edit-save { margin-top: 1rem; background: var(--red); color: #fff; border: none; border-radius: 8px; padding: 0.8rem 2rem; font-size: 1rem; cursor: pointer; width: 100%; }
+    #edit-back { margin-top: 0.5rem; background: var(--muted); color: var(--text); border: none; border-radius: 8px; padding: 0.6rem 2rem; font-size: 0.9rem; cursor: pointer; width: 100%; }
+    #history-close { display: block; margin-top: 0.8rem; background: var(--muted); color: var(--text); border: none; border-radius: 8px; padding: 0.8rem 2rem; font-size: 1rem; cursor: pointer; width: 100%; }
+    #history-wait { text-align: center; }
+    #history-wait p { color: var(--text-lo); margin: 1rem 0 1.5rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚓ Bar</h1>
+  <span id="total">€0.00</span>
+</header>
+
+<div id="drinks-grid">
+  {% for drink in drinks %}
+  <div class="drink-btn" data-id="{{ drink.id }}" data-price="{{ drink.price_cents }}" data-name="{{ drink.name }}" onclick="addToCart(this)">
+    <div class="name">{{ drink.name }}</div>
+    <div class="price">€{{ "%.2f"|format(drink.price_cents / 100) }}</div>
+    <div class="qty-badge" style="display:none">0</div>
+  </div>
+  {% endfor %}
+</div>
+
+<footer>
+  <button id="clear-btn" onclick="clearCart()">Leeren</button>
+  <button id="history-btn" onclick="startHistory()">Verlauf</button>
+  <button id="checkout-btn" disabled onclick="startCheckout()">Bezahlen</button>
+</footer>
+
+<!-- History modal -->
+<div id="history-modal">
+  <div id="history-box">
+    <!-- Step 1: waiting for card -->
+    <div id="history-wait">
+      <h2>Verlauf</h2>
+      <p id="history-status">Karte ans Lesegerät halten…</p>
+      <button onclick="cancelHistory()" style="background:#333;color:#eee;border:none;border-radius:8px;padding:0.8rem 2rem;font-size:1rem;cursor:pointer;">Abbrechen</button>
+    </div>
+
+    <!-- Step 2: transaction list -->
+    <div id="history-list" style="display:none">
+      <h2>Verlauf</h2>
+      <p id="history-subtitle"></p>
+      <div id="tx-list"></div>
+      <button id="history-close" onclick="closeHistory()">Schließen</button>
+    </div>
+
+    <!-- Step 3: edit last transaction -->
+    <div id="edit-section">
+      <h3>Letzte Buchung bearbeiten</h3>
+      <div id="edit-rows"></div>
+      <button id="edit-save" onclick="saveEdit()">Speichern</button>
+      <button id="edit-back" onclick="showHistoryList()">Zurück</button>
+    </div>
+  </div>
+</div>
+
+<!-- RFID modal -->
+<div id="modal">
+  <div id="modal-box">
+    <h2>Karte ans Lesegerät halten</h2>
+    <p id="modal-status">Warte auf Karte…</p>
+    <button id="modal-cancel" onclick="cancelCheckout()">Abbrechen</button>
+  </div>
+</div>
+
+<script>
+  const cart = {};  // { drink_id: { name, price_cents, qty } }
+  let polling = null;
+
+  function addToCart(el) {
+    const id = el.dataset.id;
+    if (!cart[id]) cart[id] = { name: el.dataset.name, price_cents: parseInt(el.dataset.price), qty: 0 };
+    cart[id].qty++;
+    const badge = el.querySelector('.qty-badge');
+    badge.textContent = cart[id].qty;
+    badge.style.display = 'inline-block';
+    el.classList.add('in-cart');
+    updateTotal();
+  }
+
+  function clearCart() {
+    Object.keys(cart).forEach(k => delete cart[k]);
+    document.querySelectorAll('.drink-btn').forEach(el => {
+      el.querySelector('.qty-badge').style.display = 'none';
+      el.classList.remove('in-cart');
+    });
+    updateTotal();
+  }
+
+  function updateTotal() {
+    const cents = Object.values(cart).reduce((s, v) => s + v.price_cents * v.qty, 0);
+    document.getElementById('total').textContent = '€' + (cents / 100).toFixed(2);
+    document.getElementById('checkout-btn').disabled = cents === 0;
+  }
+
+  function startCheckout() {
+    document.getElementById('modal').classList.add('show');
+    document.getElementById('modal-status').textContent = 'Warte auf Karte…';
+    fetch('/api/rfid/clear', { method: 'POST' });
+    polling = setInterval(pollRFID, 150);
+  }
+
+  function cancelCheckout() {
+    clearInterval(polling);
+    fetch('/api/rfid/clear', { method: 'POST' });
+    document.getElementById('modal').classList.remove('show');
+  }
+
+  async function pollRFID() {
+    const res = await fetch('/api/rfid/scan');
+    const data = await res.json();
+    if (!data.uid) return;
+
+    clearInterval(polling);
+    document.getElementById('modal-status').textContent = 'Karte erkannt — wird verarbeitet…';
+
+    const cartItems = Object.entries(cart).map(([id, v]) => ({ drink_id: parseInt(id), qty: v.qty }));
+    const resp = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rfid_uid: data.uid, cart: cartItems }),
+    });
+    const result = await resp.json();
+
+    if (resp.ok) {
+      const balanceStr = result.new_balance != null
+        ? ` — Guthaben: €${result.new_balance.toFixed(2)}`
+        : ' — Karte nicht registriert';
+      document.getElementById('modal-status').textContent =
+        `✓ €${result.total.toFixed(2)} gebucht${balanceStr}`;
+      setTimeout(() => {
+        document.getElementById('modal').classList.remove('show');
+        clearCart();
+      }, 1500);
+    } else {
+      document.getElementById('modal-status').textContent = '✗ ' + result.error;
+      setTimeout(() => {
+        document.getElementById('modal').classList.remove('show');
+        fetch('/api/rfid/clear', { method: 'POST' });
+      }, 1500);
+    }
+  }
+
+  // ---- History ----
+  let historyPolling = null;
+  let historyUID = null;
+  let historyTxs = [];
+  let editTxId = null;
+  let editItems = [];  // { drink_id, name, price_cents, qty }
+
+  function startHistory() {
+    historyUID = null;
+    historyTxs = [];
+    document.getElementById('history-wait').style.display = 'block';
+    document.getElementById('history-list').style.display = 'none';
+    document.getElementById('edit-section').style.display = 'none';
+    document.getElementById('history-status').textContent = 'Karte ans Lesegerät halten…';
+    document.getElementById('history-modal').classList.add('show');
+    fetch('/api/rfid/clear', { method: 'POST' });
+    historyPolling = setInterval(pollHistoryRFID, 150);
+  }
+
+  function cancelHistory() {
+    clearInterval(historyPolling);
+    fetch('/api/rfid/clear', { method: 'POST' });
+    document.getElementById('history-modal').classList.remove('show');
+  }
+
+  function closeHistory() {
+    document.getElementById('history-modal').classList.remove('show');
+    fetch('/api/rfid/clear', { method: 'POST' });
+  }
+
+  async function pollHistoryRFID() {
+    const res = await fetch('/api/rfid/scan');
+    const data = await res.json();
+    if (!data.uid) return;
+    clearInterval(historyPolling);
+    historyUID = data.uid;
+    document.getElementById('history-status').textContent = 'Wird geladen…';
+    const resp = await fetch(`/api/member/by-rfid/${encodeURIComponent(data.uid)}/transactions`);
+    if (!resp.ok) {
+      document.getElementById('history-status').textContent = '✗ Karte nicht registriert';
+      setTimeout(cancelHistory, 2000);
+      return;
+    }
+    const result = await resp.json();
+    historyTxs = result.transactions;
+    renderHistoryList(data.uid);
+  }
+
+  function renderHistoryList(memberName) {
+    document.getElementById('history-wait').style.display = 'none';
+    document.getElementById('edit-section').style.display = 'none';
+    document.getElementById('history-list').style.display = 'block';
+    document.getElementById('history-subtitle').textContent = memberName;
+
+    const list = document.getElementById('tx-list');
+    list.innerHTML = '';
+    if (historyTxs.length === 0) {
+      list.innerHTML = '<p style="color:#aaa">Noch keine Buchungen.</p>';
+      return;
+    }
+    historyTxs.forEach((tx, i) => {
+      const d = new Date(tx.created_at);
+      const timeStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
+        + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const itemsSummary = tx.items.map(it => `${it.qty}× ${it.name}`).join(', ');
+      const card = document.createElement('div');
+      card.className = 'tx-card' + (i === 0 ? ' latest' : '');
+      card.innerHTML = `
+        <div class="tx-meta">
+          <span class="tx-time">${timeStr}</span>
+          <span class="tx-total">€${tx.total.toFixed(2)}</span>
+        </div>
+        <div class="tx-items">${itemsSummary}</div>
+        ${i === 0 ? `<button class="edit-btn" onclick="startEdit(${tx.id})">Bearbeiten</button>` : ''}
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function showHistoryList() {
+    document.getElementById('edit-section').style.display = 'none';
+    document.getElementById('history-list').style.display = 'block';
+  }
+
+  function startEdit(txId) {
+    editTxId = txId;
+    const tx = historyTxs.find(t => t.id === txId);
+    editItems = tx.items.map(it => ({ drink_id: it.drink_id, name: it.name, price_cents: it.price_cents, qty: it.qty }));
+    renderEditRows();
+    document.getElementById('history-list').style.display = 'none';
+    document.getElementById('edit-section').style.display = 'block';
+  }
+
+  function renderEditRows() {
+    const container = document.getElementById('edit-rows');
+    container.innerHTML = '';
+    editItems.forEach((item, i) => {
+      const row = document.createElement('div');
+      row.className = 'edit-row';
+      row.innerHTML = `
+        <span class="item-name">${item.name}<br><small style="color:#aaa">€${(item.price_cents/100).toFixed(2)} pro Stück</small></span>
+        <div class="qty-ctrl">
+          <button onclick="changeQty(${i}, -1)">−</button>
+          <span id="qty-${i}">${item.qty}</span>
+          <button onclick="changeQty(${i}, +1)">+</button>
+        </div>
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  function changeQty(i, delta) {
+    editItems[i].qty = Math.max(0, editItems[i].qty + delta);
+    document.getElementById(`qty-${i}`).textContent = editItems[i].qty;
+  }
+
+  async function saveEdit() {
+    const items = editItems.map(it => ({ drink_id: it.drink_id, qty: it.qty }));
+    const resp = await fetch(`/api/transaction/${editTxId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rfid_uid: historyUID, items }),
+    });
+    const result = await resp.json();
+    if (resp.ok) {
+      document.getElementById('edit-section').innerHTML =
+        `<p style="text-align:center;padding:2rem;color:#4caf50">✓ Gespeichert! Neu: €${result.new_total.toFixed(2)}<br>Guthaben: €${result.new_balance.toFixed(2)}</p>`;
+      setTimeout(closeHistory, 2500);
+    } else {
+      alert('Fehler: ' + result.error);
+    }
+  }
+
+  function sizeGrid() {
+    const grid = document.getElementById('drinks-grid');
+    const n = grid.children.length;
+    if (n === 0) return;
+    const style = getComputedStyle(grid);
+    const GAP = parseFloat(style.gap) || 16;
+    const PAD = parseFloat(style.padding) || 24;
+    const w = grid.clientWidth  - PAD * 2;
+    const h = grid.clientHeight - PAD * 2;
+    if (w <= 0 || h <= 0) return;
+    let bestCols = 1, bestSize = 0;
+    for (let cols = 1; cols <= n; cols++) {
+      const rows  = Math.ceil(n / cols);
+      const cardW = (w - GAP * (cols - 1)) / cols;
+      const cardH = (h - GAP * (rows - 1)) / rows;
+      const size  = Math.min(cardW, cardH);
+      if (size > bestSize) { bestSize = size; bestCols = cols; }
+    }
+    grid.style.gridTemplateColumns = `repeat(${bestCols}, ${Math.floor(bestSize)}px)`;
+  }
+
+  new ResizeObserver(sizeGrid).observe(document.getElementById('drinks-grid'));
+</script>
+</body>
+</html>

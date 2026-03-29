@@ -1,0 +1,52 @@
+{% extends "admin/base.html" %}
+{% block title %}Grafiken{% endblock %}
+{% block content %}
+<h1>Grafiken</h1>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .chart-card { background: #fff; border-radius: 10px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  .chart-card h3 { margin-bottom: 1rem; font-size: 1rem; color: #444; }
+  .chart-full { grid-column: 1 / -1; }
+  @media (max-width: 700px) { .charts { grid-template-columns: 1fr; } .chart-full { grid-column: 1; } }
+</style>
+
+<div class="charts">
+  <div class="chart-card chart-full">
+    <h3>Umsatz pro Tag (€)</h3>
+    <canvas id="chartDays"></canvas>
+  </div>
+
+  <div class="chart-card chart-full">
+    <h3>Buchungen nach Uhrzeit</h3>
+    <canvas id="chartHours"></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h3>Umsatz pro UID – Top 10 (€)</h3>
+    <canvas id="chartUidRevenue"></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h3>Buchungen pro UID – Top 10</h3>
+    <canvas id="chartUidCount"></canvas>
+  </div>
+</div>
+
+<script>
+const C = (id, labels, data, label, color) => new Chart(document.getElementById(id), {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [{ label, data, backgroundColor: color + 'cc', borderColor: color, borderWidth: 1 }]
+  },
+  options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+});
+
+C('chartDays',       {{ chart_days|tojson }},       {{ chart_day_revenue|tojson }}, 'Umsatz €',  '#dd3333');
+C('chartHours',      {{ chart_hours|tojson }},      {{ hour_count|tojson }},        'Buchungen', '#222222');
+C('chartUidRevenue', {{ chart_uid_labels|tojson }}, {{ chart_uid_revenue|tojson }}, 'Umsatz €',  '#dd3333');
+C('chartUidCount',   {{ chart_uid_labels|tojson }}, {{ chart_uid_count|tojson }},   'Buchungen', '#222222');
+</script>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "admin/base.html" %}
+{% block title %}Getränke{% endblock %}
+{% block content %}
+<h1>Getränke</h1>
+
+<div class="card">
+  <h2 style="margin-bottom:1rem">Getränk hinzufügen</h2>
+  <form method="post" style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
+    <input name="name" placeholder="Name" required>
+    <input name="price" type="number" step="0.01" min="0" placeholder="Preis (€)" required style="width:130px">
+    <button class="btn btn-primary" type="submit">Hinzufügen</button>
+  </form>
+</div>
+
+<div class="card">
+  <p style="color:#aaa;font-size:0.82rem;margin-bottom:1rem">Ziehen zum Sortieren. Änderungen an Name, Preis und Verfügbarkeit werden mit Speichern gesichert.</p>
+
+  <div id="drinks-list">
+  {% for d in drinks %}
+  <div class="drink-row" draggable="true" data-id="{{ d.id }}">
+    <span class="drag-handle">&#9776;</span>
+
+    <form method="post" action="{{ url_for('admin.drinks_edit', drink_id=d.id) }}" class="drink-form">
+      <input class="field-name" name="name" value="{{ d.name }}">
+      <div class="price-wrap">
+        <span class="euro">€</span>
+        <input class="field-price" name="price" type="number" step="0.01" min="0"
+               value="{{ "%.2f"|format(d.price_cents / 100) }}">
+      </div>
+
+      <label class="toggle" title="Available">
+        <input type="checkbox" name="available" {% if d.available %}checked{% endif %}>
+        <span class="track"><span class="thumb"></span></span>
+      </label>
+
+      <button class="btn btn-sm btn-secondary" type="submit">Speichern</button>
+    </form>
+
+    <form method="post" action="{{ url_for('admin.drinks_delete', drink_id=d.id) }}"
+          onsubmit="return confirm('{{ d.name }} löschen?')">
+      <button class="btn-delete" type="submit" title="Delete">&#10005;</button>
+    </form>
+  </div>
+  {% endfor %}
+  </div>
+</div>
+
+<style>
+  #drinks-list { display: flex; flex-direction: column; gap: 0.4rem; }
+
+  .drink-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    background: #fafafa; border: 1px solid #ebebeb; border-radius: 8px;
+    padding: 0.6rem 0.9rem; transition: background 0.15s;
+  }
+  .drink-row:hover { background: #f4f4f4; }
+  .drink-row.dragging { opacity: 0.4; }
+  .drink-row.drag-over { border-color: #e94560; background: #fff5f7; }
+
+  .drag-handle { color: #bbb; cursor: grab; font-size: 1rem; flex-shrink: 0; }
+
+  .drink-form { display: flex; align-items: center; gap: 0.6rem; flex: 1; }
+
+  .field-name {
+    flex: 1; border: 1px solid transparent; background: transparent;
+    font-size: 0.95rem; padding: 0.3rem 0.5rem; border-radius: 6px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .field-name:hover, .field-name:focus {
+    border-color: #ccc; background: #fff; outline: none;
+  }
+
+  .price-wrap { position: relative; flex-shrink: 0; }
+  .price-wrap .euro { position: absolute; left: 0.5rem; top: 50%; transform: translateY(-50%); color: #888; font-size: 0.9rem; pointer-events: none; }
+  .field-price {
+    width: 80px; padding: 0.3rem 0.5rem 0.3rem 1.4rem;
+    border: 1px solid transparent; background: transparent;
+    border-radius: 6px; font-size: 0.95rem;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .field-price:hover, .field-price:focus {
+    border-color: #ccc; background: #fff; outline: none;
+  }
+
+  /* Toggle switch */
+  .toggle { display: flex; align-items: center; cursor: pointer; flex-shrink: 0; }
+  .toggle input { display: none; }
+  .track {
+    width: 36px; height: 20px; background: #ccc; border-radius: 999px;
+    position: relative; transition: background 0.2s;
+  }
+  .toggle input:checked + .track { background: #4caf50; }
+  .thumb {
+    position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; background: #fff;
+    border-radius: 50%; transition: left 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
+  .toggle input:checked + .track .thumb { left: 18px; }
+
+  .btn-delete {
+    background: none; border: none; cursor: pointer;
+    color: #ccc; font-size: 1rem; padding: 0.2rem 0.4rem;
+    border-radius: 6px; transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-delete:hover { color: #fff; background: #e94560; }
+</style>
+
+<script>
+  const list = document.getElementById('drinks-list');
+  let dragged = null;
+
+  list.addEventListener('dragstart', e => {
+    dragged = e.target.closest('.drink-row');
+    setTimeout(() => dragged.classList.add('dragging'), 0);
+  });
+
+  list.addEventListener('dragend', () => {
+    dragged.classList.remove('dragging');
+    list.querySelectorAll('.drink-row').forEach(r => r.classList.remove('drag-over'));
+    dragged = null;
+    saveOrder();
+  });
+
+  list.addEventListener('dragover', e => {
+    e.preventDefault();
+    const target = e.target.closest('.drink-row');
+    if (!target || target === dragged) return;
+    list.querySelectorAll('.drink-row').forEach(r => r.classList.remove('drag-over'));
+    target.classList.add('drag-over');
+    const rect = target.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    list.insertBefore(dragged, after ? target.nextSibling : target);
+  });
+
+  function saveOrder() {
+    const ids = [...list.querySelectorAll('.drink-row')].map(r => parseInt(r.dataset.id));
+    fetch('{{ url_for("admin.drinks_reorder") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ids),
+    });
+  }
+</script>
+{% endblock %}
