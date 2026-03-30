@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timezone
+from flask import current_app
 from app.extensions import db
 
 
@@ -12,6 +13,12 @@ class Transaction(db.Model):
     items_json = db.Column(db.Text, nullable=False)  # JSON list of {drink_id, name, qty, price_cents}
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     synced = db.Column(db.Boolean, default=False, nullable=False)
+
+    def is_editable(self) -> bool:
+        """True while the transaction is within the configured edit window."""
+        window = current_app.config.get("TRANSACTION_EDIT_WINDOW_SECONDS", 3600)
+        age = (datetime.now(timezone.utc) - self.created_at.replace(tzinfo=timezone.utc)).total_seconds()
+        return age <= window
 
     @property
     def items(self):

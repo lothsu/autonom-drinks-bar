@@ -167,6 +167,8 @@ def update_transaction(tx_id):
     tx = Transaction.query.get(tx_id)
     if not tx or tx.rfid_uid != rfid_uid:
         return _err("Transaction not found", 404)
+    if not tx.is_editable():
+        return _err("Buchung kann nicht mehr bearbeitet werden", 403)
 
     # Build new items list (skip qty <= 0)
     new_items = []

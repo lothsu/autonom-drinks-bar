@@ -21,6 +21,11 @@ class Config:
     CLOUD_URL     = os.environ.get("CLOUD_URL", "")
     CLOUD_API_KEY = os.environ.get("CLOUD_API_KEY", "")
     BAR_LOCATION  = os.environ.get("BAR_LOCATION", "Bar")
+    # Unique identifier for this bar — must match an entry in the cloud's API_KEYS registry
+    # Generate with: python -c "import uuid; print(uuid.uuid4().hex)"
+    BAR_UID       = os.environ.get("BAR_UID", "")
+    # How long (seconds) a transaction can be edited and is held back from sync
+    TRANSACTION_EDIT_WINDOW_SECONDS = int(os.environ.get("TRANSACTION_EDIT_WINDOW_SECONDS", "3600"))
 
 
 class DevelopmentConfig(Config):

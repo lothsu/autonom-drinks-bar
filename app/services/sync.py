@@ -9,7 +9,11 @@ without restarting the process.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import threading
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
@@ -33,13 +37,29 @@ class BaseSyncProvider(ABC):
 class NullProvider(BaseSyncProvider):
     """No-op provider — offsite sync disabled. Nothing is pushed, nothing is marked synced."""
 
-    def push_transactions(self, records):
+    def push_transactions(self, _records):
         return []  # don't mark anything synced — data stays available for later
 
 
 # ---------------------------------------------------------------------------
 # Cloud provider (HTTP POST to autonom-drinks-cloud)
 # ---------------------------------------------------------------------------
+
+def _sign_request(api_key: str, bar_uid: str, body: bytes) -> dict:
+    """
+    Build authentication headers for a signed request.
+
+    Signature: HMAC-SHA256(api_key, "{bar_uid}:{timestamp}:{body}")
+    """
+    timestamp = str(int(time.time()))
+    message = f"{bar_uid}:{timestamp}:".encode() + body
+    signature = hmac.new(api_key.encode(), message, hashlib.sha256).hexdigest()
+    return {
+        "X-Bar-UID": bar_uid,
+        "X-Timestamp": timestamp,
+        "X-Signature": signature,
+    }
+
 
 class CloudProvider(BaseSyncProvider):
     """
@@ -52,27 +72,39 @@ class CloudProvider(BaseSyncProvider):
         self._app = app
 
     def _settings(self) -> tuple[str, str, str]:
-        """Return (cloud_url, api_key, location) from DB, falling back to env config."""
+        """Return (cloud_url, api_key, bar_uid) from DB, falling back to env config."""
         from app.models.setting import Setting
         cfg = self._app.config
-        url      = Setting.get("CLOUD_URL")      or cfg.get("CLOUD_URL", "")
-        api_key  = Setting.get("CLOUD_API_KEY")  or cfg.get("CLOUD_API_KEY", "")
-        location = Setting.get("BAR_LOCATION")   or cfg.get("BAR_LOCATION", "Bar")
-        return url.rstrip("/"), api_key, location
+        url     = Setting.get("CLOUD_URL")     or cfg.get("CLOUD_URL", "")
+        api_key = Setting.get("CLOUD_API_KEY") or cfg.get("CLOUD_API_KEY", "")
+        bar_uid = Setting.get("BAR_UID")       or cfg.get("BAR_UID", "")
+        return url.rstrip("/"), api_key, bar_uid
+
+    def _check_url(self, url: str) -> str | None:
+        """Return an error string if the URL is unusable, else None."""
+        if not url:
+            return "Cloud URL not configured"
+        if self._app.config.get("ENV") == "production" or not self._app.debug:
+            if not url.startswith("https://"):
+                return f"CLOUD_URL must use HTTPS in production (got: {url!r})"
+        return None
 
     def send_heartbeat(self):
         try:
             import requests as _requests
         except ImportError:
             return
-        url, api_key, location = self._settings()
-        if not url or not api_key:
+        url, api_key, bar_uid = self._settings()
+        err = self._check_url(url)
+        if err or not api_key or not bar_uid:
             return
         try:
+            body = json.dumps({}).encode()
+            headers = {"Content-Type": "application/json", **_sign_request(api_key, bar_uid, body)}
             _requests.post(
                 f"{url}/api/v1/heartbeat",
-                json={"bar_location": location},
-                headers={"X-Api-Key": api_key},
+                data=body,
+                headers=headers,
                 timeout=5,
             )
         except Exception:
@@ -85,16 +117,31 @@ class CloudProvider(BaseSyncProvider):
             print("[Sync] 'requests' library not installed — cannot sync to cloud.")
             return []
 
-        url, api_key, location = self._settings()
-        if not url or not api_key:
-            print("[Sync] Cloud URL or API key not configured — skipping.")
+        url, api_key, bar_uid = self._settings()
+
+        url_err = self._check_url(url)
+        if url_err:
+            print(f"[Sync] {url_err} — skipping.")
             return []
+        if not api_key:
+            print("[Sync] API key not configured — skipping.")
+            return []
+        if not bar_uid:
+            print("[Sync] BAR_UID not configured — skipping.")
+            return []
+
+        payload = {"transactions": records}  # bar_location is resolved server-side from BAR_UID
+        body = json.dumps(payload).encode()
+        headers = {
+            "Content-Type": "application/json",
+            **_sign_request(api_key, bar_uid, body),
+        }
 
         try:
             resp = _requests.post(
                 f"{url}/api/v1/sync",
-                json={"bar_location": location, "transactions": records},
-                headers={"X-Api-Key": api_key},
+                data=body,
+                headers=headers,
                 timeout=15,
             )
         except Exception as exc:
@@ -193,7 +240,9 @@ class SyncService:
         from app.extensions import db
         from app.models.transaction import Transaction
 
-        unsynced = Transaction.query.filter_by(synced=False).all()
+        all_unsynced = Transaction.query.filter_by(synced=False).all()
+        # Hold back transactions still within the edit window
+        unsynced = [t for t in all_unsynced if not t.is_editable()]
         if not unsynced:
             return {"ok": True, "sent": 0, "accepted": 0, "msg": "Nichts zu synchronisieren."}
 
@@ -218,6 +267,6 @@ class SyncService:
             print(f"[Sync] {msg}")
             return {"ok": True, "sent": len(records), "accepted": len(synced_ids), "msg": msg}
         else:
-            msg = "Cloud nicht erreichbar oder API-Key falsch."
+            msg = "Cloud nicht erreichbar oder Authentifizierung fehlgeschlagen."
             print(f"[Sync] Push failed — {msg}")
             return {"ok": False, "sent": len(records), "accepted": 0, "msg": msg}
