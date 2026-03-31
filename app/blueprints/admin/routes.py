@@ -208,7 +208,7 @@ def sync_now():
 # Settings
 # ------------------------------------------------------------------
 
-_SETTING_KEYS = ["CLOUD_URL", "CLOUD_API_KEY", "BAR_LOCATION"]
+_SETTING_KEYS = ["CLOUD_URL", "CLOUD_API_KEY", "BAR_UID"]
 
 
 @admin_bp.get("/settings")
@@ -257,7 +257,7 @@ def settings_test():
         return jsonify({"ok": False, "msg": "URL oder API-Key nicht konfiguriert."})
     try:
         import requests as _requests
-        resp = _requests.get(f"{url.rstrip('/')}/api/v1/health", timeout=5)
+        resp = _requests.get(f"{url.rstrip('/')}/health", timeout=5)
         if resp.status_code == 200:
             return jsonify({"ok": True, "msg": f"Verbunden ({resp.json().get('utc', '')})"})
         return jsonify({"ok": False, "msg": f"HTTP {resp.status_code}"})

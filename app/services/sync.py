@@ -72,7 +72,10 @@ class CloudProvider(BaseSyncProvider):
         self._app = app
 
     def _settings(self) -> tuple[str, str, str]:
-        """Return (cloud_url, api_key, bar_uid) from DB, falling back to env config."""
+        """Return (api_base, api_key, bar_uid) from DB, falling back to env config.
+
+        CLOUD_URL should be the full API base, e.g. https://host/casino/api/v1
+        """
         from app.models.setting import Setting
         cfg = self._app.config
         url     = Setting.get("CLOUD_URL")     or cfg.get("CLOUD_URL", "")
@@ -102,7 +105,7 @@ class CloudProvider(BaseSyncProvider):
             body = json.dumps({}).encode()
             headers = {"Content-Type": "application/json", **_sign_request(api_key, bar_uid, body)}
             _requests.post(
-                f"{url}/api/v1/heartbeat",
+                f"{url}/heartbeat",
                 data=body,
                 headers=headers,
                 timeout=5,
@@ -130,16 +133,17 @@ class CloudProvider(BaseSyncProvider):
             print("[Sync] BAR_UID not configured — skipping.")
             return []
 
-        payload = {"transactions": records}  # bar_location is resolved server-side from BAR_UID
+        payload = {"transactions": records}
         body = json.dumps(payload).encode()
-        headers = {
-            "Content-Type": "application/json",
-            **_sign_request(api_key, bar_uid, body),
-        }
+        auth_headers = _sign_request(api_key, bar_uid, body)
+        headers = {"Content-Type": "application/json", **auth_headers}
+
+        print(f"[Sync] POST {url}/sync  bar_uid={bar_uid!r}  records={len(records)}  ts={auth_headers['X-Timestamp']}")
+        print(f"[Sync] payload: {body.decode()[:500]}")
 
         try:
             resp = _requests.post(
-                f"{url}/api/v1/sync",
+                f"{url}/sync",
                 data=body,
                 headers=headers,
                 timeout=15,
@@ -148,8 +152,9 @@ class CloudProvider(BaseSyncProvider):
             print(f"[Sync] Cloud request failed: {exc}")
             return []
 
+        print(f"[Sync] Response HTTP {resp.status_code}: {resp.text[:500]}")
+
         if resp.status_code != 200:
-            print(f"[Sync] Cloud returned HTTP {resp.status_code}: {resp.text[:200]}")
             return []
 
         data = resp.json()
@@ -246,7 +251,18 @@ class SyncService:
         if not unsynced:
             return {"ok": True, "sent": 0, "accepted": 0, "msg": "Nichts zu synchronisieren."}
 
-        records = [t.to_dict() for t in unsynced]
+        def _prepare(t):
+            d = t.to_dict()
+            # Convert hex RFID (e.g. "126C2B2D") to decimal string ("309078829")
+            # to match the format used in member_rfids on the cloud side.
+            if d.get("rfid_uid"):
+                try:
+                    d["rfid_uid"] = str(int(d["rfid_uid"], 16))
+                except (ValueError, TypeError):
+                    pass
+            return d
+
+        records = [_prepare(t) for t in unsynced]
         try:
             synced_ids = provider.push_transactions(records)
         except Exception as exc:
