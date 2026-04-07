@@ -8,10 +8,10 @@
 
   <form method="post" action="{{ url_for('admin.settings_save') }}">
     <div class="form-group">
-      <label for="CLOUD_URL">Cloud URL</label>
+      <label for="CLOUD_URL">Cloud API URL</label>
       <input type="text" id="CLOUD_URL" name="CLOUD_URL"
              value="{{ values.CLOUD_URL }}"
-             placeholder="https://mein-cloud-server.de">
+             placeholder="https://mein-cloud-server.de/casino/api/v1">
     </div>
 
     <div class="form-group">

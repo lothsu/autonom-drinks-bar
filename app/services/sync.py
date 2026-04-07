@@ -87,7 +87,8 @@ class CloudProvider(BaseSyncProvider):
         """Return an error string if the URL is unusable, else None."""
         if not url:
             return "Cloud URL not configured"
-        if self._app.config.get("ENV") == "production" or not self._app.debug:
+        is_localhost = url.startswith("http://localhost") or url.startswith("http://127.0.0.1")
+        if not is_localhost and (self._app.config.get("ENV") == "production" or not self._app.debug):
             if not url.startswith("https://"):
                 return f"CLOUD_URL must use HTTPS in production (got: {url!r})"
         return None
@@ -157,7 +158,11 @@ class CloudProvider(BaseSyncProvider):
         if resp.status_code != 200:
             return []
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except Exception as exc:
+            print(f"[Sync] Failed to parse cloud response as JSON: {exc} — body: {resp.text[:200]!r}")
+            return []
         synced_ids = data.get("accepted", []) + data.get("duplicate", [])
         print(
             f"[Sync] Cloud: +{len(data.get('accepted', []))} new, "
