@@ -5,3 +5,7 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+
+# Ansible — keep secrets off the repo
+ansible/inventory.ini
+ansible/group_vars/all/vault.yml

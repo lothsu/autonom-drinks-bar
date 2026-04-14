@@ -1,0 +1,255 @@
+---
+- name: autonom-drinks-bar — full Pi setup
+  hosts: bar
+  become: true
+
+  vars:
+    pip_packages:
+      - flask>=3.0
+      - flask-sqlalchemy>=3.1
+      - apscheduler>=3.10
+      - python-dotenv>=1.0
+      - pyserial>=3.5
+      - requests>=2.31
+
+  # ─────────────────────────────────────────────
+  # 1. SYSTEM
+  # ─────────────────────────────────────────────
+  tasks:
+    - name: Run full system upgrade
+      apt:
+        update_cache: yes
+        upgrade: full
+        cache_valid_time: 3600
+
+    - name: Install system dependencies
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+          - python3-setuptools
+          - git
+          - chromium
+          - unclutter
+          - xdotool
+          - xserver-xorg
+          - x11-xserver-utils
+          - xinit
+          - openbox
+        state: present
+
+    # ─────────────────────────────────────────────
+    # 2. UART (for RFID reader)
+    # ─────────────────────────────────────────────
+    - name: Enable UART in /boot/config.txt
+      lineinfile:
+        path: /boot/config.txt
+        line: "enable_uart=1"
+        create: yes
+
+    - name: Disable Bluetooth to free hardware UART (Pi 3)
+      lineinfile:
+        path: /boot/config.txt
+        line: "dtoverlay=disable-bt"
+        create: yes
+      # Bluetooth uses the hardware UART on Pi 3; Pi 4/5 have a dedicated UART so
+      # this line is harmless but keeps Pi 3 working if hardware is swapped.
+
+    - name: Add app user to dialout group (serial port access for RFID)
+      user:
+        name: "{{ app_user }}"
+        groups: dialout
+        append: yes
+
+    - name: Mask serial-getty on ttyS0 (console on serial conflicts with RFID reader)
+      systemd:
+        name: serial-getty@ttyS0.service
+        enabled: false
+        masked: true
+        state: stopped
+      ignore_errors: true   # not present on all OS images
+
+    # ─────────────────────────────────────────────
+    # 3. APP — clone & venv
+    # ─────────────────────────────────────────────
+    - name: Clone / update repository
+      git:
+        repo: "{{ app_repo }}"
+        dest: "{{ app_dir }}"
+        version: master
+        force: no           # never overwrite local changes
+
+    - name: Set repo ownership to app user
+      file:
+        path: "{{ app_dir }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        recurse: yes
+
+    - name: Create Python virtual environment
+      command: python3 -m venv "{{ app_dir }}/.venv"
+      args:
+        creates: "{{ app_dir }}/.venv/bin/activate"
+
+    - name: Install Python dependencies into venv
+      pip:
+        requirements: "{{ app_dir }}/requirements.txt"
+        virtualenv: "{{ app_dir }}/.venv"
+        state: present
+
+    # ─────────────────────────────────────────────
+    # 4. .env — secrets & config
+    # ─────────────────────────────────────────────
+    - name: Deploy .env from vault variables
+      copy:
+        dest: "{{ app_dir }}/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0600"        # only the app user can read secrets
+        content: |
+          FLASK_ENV={{ flask_env }}
+          SECRET_KEY={{ vault_secret_key }}
+          ADMIN_PASSWORD={{ vault_admin_password }}
+          RFID_MOCK={{ rfid_mock }}
+          RFID_PORT={{ rfid_port }}
+          SYNC_PROVIDER={{ sync_provider }}
+          SYNC_INTERVAL_SECONDS={{ sync_interval_seconds }}
+          CLOUD_URL={{ vault_cloud_url | default('') }}
+          CLOUD_API_KEY={{ vault_cloud_api_key | default('') }}
+          BAR_LOCATION={{ bar_location }}
+          BAR_UID={{ vault_bar_uid | default('') }}
+
+    # ─────────────────────────────────────────────
+    # 5. SYSTEMD — Flask service
+    # ─────────────────────────────────────────────
+    - name: Install autonom-drinks systemd service
+      copy:
+        dest: /etc/systemd/system/autonom-drinks.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=autonom-drinks Flask server
+          After=network.target
+
+          [Service]
+          User={{ app_user }}
+          WorkingDirectory={{ app_dir }}
+          EnvironmentFile={{ app_dir }}/.env
+          ExecStart={{ app_dir }}/.venv/bin/python -u run.py
+          Restart=always
+          RestartSec=5
+          StandardOutput=journal
+          StandardError=journal
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start autonom-drinks service
+      systemd:
+        name: autonom-drinks
+        daemon_reload: yes
+        enabled: true
+        state: started
+
+    # ─────────────────────────────────────────────
+    # 6. KIOSK — X11 + Chromium via systemd (no desktop environment needed)
+    # ─────────────────────────────────────────────
+    - name: Allow app user to start X without root
+      lineinfile:
+        path: /etc/X11/Xwrapper.config
+        regexp: "^allowed_users="
+        line: "allowed_users=anybody"
+        create: yes
+
+    - name: Create openbox autostart directory
+      file:
+        path: "/home/{{ app_user }}/.config/openbox"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+
+    - name: Openbox autostart — launch Chromium kiosk
+      copy:
+        dest: "/home/{{ app_user }}/.config/openbox/autostart"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+        content: |
+          # Hide mouse cursor when idle
+          unclutter -idle 0.1 -root &
+          # Disable screen blanking
+          xset s off
+          xset s noblank
+          xset -dpms
+          # Wait for Flask then open Chromium in kiosk mode
+          until curl -sf http://localhost:{{ app_port }} > /dev/null; do sleep 1; done
+          chromium --kiosk \
+                   --noerrdialogs \
+                   --disable-infobars \
+                   --disable-session-crashed-bubble \
+                   --disable-restore-session-state \
+                   --incognito \
+                   http://localhost:{{ app_port }} &
+
+    - name: Install kiosk systemd service (starts X + openbox + Chromium)
+      copy:
+        dest: /etc/systemd/system/kiosk.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Kiosk — X11 + Chromium
+          After=autonom-drinks.service
+          Requires=autonom-drinks.service
+
+          [Service]
+          User={{ app_user }}
+          Environment=DISPLAY=:0
+          ExecStart=/usr/bin/startx /usr/bin/openbox-session
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable kiosk service
+      systemd:
+        name: kiosk
+        daemon_reload: yes
+        enabled: true
+        state: started
+
+    # ─────────────────────────────────────────────
+    # 7. SYSTEM UPDATES — unattended-upgrades
+    # ─────────────────────────────────────────────
+    - name: Install unattended-upgrades
+      apt:
+        name: unattended-upgrades
+        state: present
+
+    - name: Enable unattended-upgrades (security updates only)
+      copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        mode: "0644"
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+          APT::Periodic::Download-Upgradeable-Packages "1";
+          APT::Periodic::AutocleanInterval "7";
+
+    - name: Configure unattended-upgrades (security only, auto-reboot at 3am)
+      copy:
+        dest: /etc/apt/apt.conf.d/50unattended-upgrades
+        mode: "0644"
+        content: |
+          Unattended-Upgrade::Allowed-Origins {
+              "${distro_id}:${distro_codename}";
+              "${distro_id}:${distro_codename}-security";
+              "${distro_id}ESMApps:${distro_codename}-apps-security";
+              "${distro_id}ESM:${distro_codename}-infra-security";
+          };
+          Unattended-Upgrade::Package-Blacklist {};
+          Unattended-Upgrade::Automatic-Reboot "true";
+          Unattended-Upgrade::Automatic-Reboot-Time "03:00";
+          Unattended-Upgrade::Remove-Unused-Dependencies "true";

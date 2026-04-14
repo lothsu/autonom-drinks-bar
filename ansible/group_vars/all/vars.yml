@@ -1,0 +1,12 @@
+# Non-secret configuration — safe to commit
+app_repo: "https://github.com/lothsu/autonom-drinks-bar.git"
+app_dir: "/home/admin/autonom-drinks-bar"
+app_user: "admin"
+app_port: 5000
+
+rfid_mock: "false"
+rfid_port: "auto"
+sync_provider: "none"
+sync_interval_seconds: "300"
+bar_location: "Vereinsheim"
+flask_env: "production"
