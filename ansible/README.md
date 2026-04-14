@@ -63,14 +63,21 @@ Save the vault password somewhere safe (password manager). You need it every tim
 ansible-playbook -i inventory.ini site.yml --ask-vault-pass
 ```
 
-That's it. The Pi will:
-- Run a full system upgrade
-- Install all dependencies
-- Clone the app
-- Deploy your `.env` with secrets
-- Enable the Flask systemd service
-- Configure Chromium kiosk autostart
-- Enable automatic security updates (nightly, auto-reboot at 3am if needed)
+That's it. The playbook runs these steps in order:
+
+**1. System** — `apt upgrade`, then installs Python 3, git, Chromium, Openbox, X11 utilities, and `unclutter`.
+
+**2. UART / RFID** — enables hardware UART in `/boot/config.txt`, disables Bluetooth to free the hardware UART (Pi 3 compatibility), adds the app user to the `dialout` group for serial port access, and masks `serial-getty@ttyS0` so the console doesn't conflict with the RFID reader.
+
+**3. App — clone & venv** — clones (or updates) the repository without overwriting local changes, sets correct ownership, creates a Python virtual environment, and installs all Python dependencies from `requirements.txt`.
+
+**4. Secrets / `.env`** — writes the `.env` file from your vault variables (Flask config, secret key, admin password, RFID settings, cloud sync config). The file is `chmod 0600` so only the app user can read it.
+
+**5. Flask service** — installs and enables `/etc/systemd/system/autonom-drinks.service` so the Flask server starts on boot and restarts automatically on crash.
+
+**6. Kiosk** — configures X11 + Openbox + Chromium as a dedicated `kiosk.service` that starts after the Flask service. Chromium opens `http://localhost:<port>` in kiosk mode (full-screen, no address bar, touch events on, translate off, incognito). `unclutter` hides the mouse cursor; screen blanking and DPMS are disabled.
+
+**7. Automatic updates** — installs `unattended-upgrades` and configures it to apply security updates nightly, clean up unused packages weekly, and auto-reboot at 3 am if a kernel update requires it.
 
 ---
 
