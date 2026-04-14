@@ -338,9 +338,7 @@
     });
     const result = await resp.json();
     if (resp.ok) {
-      document.getElementById('edit-section').innerHTML =
-        `<p style="text-align:center;padding:2rem;color:#4caf50">✓ Gespeichert! Neu: €${result.new_total.toFixed(2)}<br>Guthaben: €${result.new_balance.toFixed(2)}</p>`;
-      setTimeout(closeHistory, 2500);
+      closeHistory();
     } else {
       alert('Fehler: ' + result.error);
     }
