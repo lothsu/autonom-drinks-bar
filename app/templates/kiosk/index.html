@@ -368,6 +368,22 @@
   }
 
   new ResizeObserver(sizeGrid).observe(document.getElementById('drinks-grid'));
+
+  // Reload page if drinks change in admin (new drink, price change, removal)
+  const _drinksKey = {{ drinks | map(attribute='id') | list | tojson }}.join(':')
+    + '|' + {{ drinks | map(attribute='name') | list | tojson }}.join(':')
+    + '|' + {{ drinks | map(attribute='price_cents') | list | tojson }}.join(':');
+
+  setInterval(async () => {
+    try {
+      const res = await fetch('/api/drinks');
+      const data = await res.json();
+      const key = data.map(d => d.id).join(':')
+        + '|' + data.map(d => d.name).join(':')
+        + '|' + data.map(d => d.price_cents).join(':');
+      if (key !== _drinksKey) location.reload();
+    } catch (_) {}
+  }, 5000);
 </script>
 </body>
 </html>
