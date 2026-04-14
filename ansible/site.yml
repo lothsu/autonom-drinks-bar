@@ -170,6 +170,26 @@
         group: "{{ app_user }}"
         mode: "0755"
 
+    - name: Create Chromium config directory
+      file:
+        path: "/home/{{ app_user }}/.config/chromium"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+
+    - name: Disable Chromium translate via Local State
+      copy:
+        dest: "/home/{{ app_user }}/.config/chromium/Local State"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+        content: |
+          {
+            "translate": { "enabled": false },
+            "translate_site_blacklist": []
+          }
+
     - name: Openbox autostart — launch Chromium kiosk
       copy:
         dest: "/home/{{ app_user }}/.config/openbox/autostart"
@@ -177,8 +197,8 @@
         group: "{{ app_user }}"
         mode: "0644"
         content: |
-          # Hide mouse cursor when idle
-          unclutter -idle 0.1 -root &
+          # Hide mouse cursor immediately and when idle
+          unclutter -idle 0 -root &
           # Disable screen blanking
           xset s off
           xset s noblank
@@ -190,6 +210,10 @@
                    --disable-infobars \
                    --disable-session-crashed-bubble \
                    --disable-restore-session-state \
+                   --disable-features=Translate \
+                   --disable-translate \
+                   --touch-events=enabled \
+                   --enable-features=OverlayScrollbar \
                    --incognito \
                    http://localhost:{{ app_port }} &
 
