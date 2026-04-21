@@ -117,6 +117,110 @@ def drinks_delete(drink_id):
     return redirect(url_for("admin.drinks"))
 
 
+# ------------------------------------------------------------------
+# Members / RFID import
+# ------------------------------------------------------------------
+
+def _parse_rfid_excel(file_obj):
+    """Parse uploaded Excel file, return list of rfid_hex strings."""
+    import openpyxl
+    wb = openpyxl.load_workbook(file_obj, data_only=True)
+    ws = wb.active
+    for name in wb.sheetnames:
+        if name.lower() == "chips":
+            ws = wb[name]
+            break
+
+    rows = list(ws.iter_rows(values_only=True))
+    rfid_col = None
+    header_row = None
+
+    for ri, row in enumerate(rows[:5]):
+        row_lower = [str(c).strip().lower() if c is not None else "" for c in row]
+        for alias in ("rfid hid", "rfid_id", "rfid", "uid", "karten-id", "card_id"):
+            if alias in row_lower:
+                rfid_col = row_lower.index(alias)
+                header_row = ri
+                break
+        if rfid_col is not None:
+            break
+
+    if rfid_col is None:
+        raise ValueError("RFID-Spalte nicht gefunden; erwartet: 'RFID HID', 'rfid_id', 'rfid' o.ä.")
+
+    results = []
+    for row in rows[header_row + 1:]:
+        raw = str(row[rfid_col]).strip() if rfid_col < len(row) and row[rfid_col] is not None else ""
+        if not raw or raw.lower() == "none":
+            continue
+        try:
+            rfid_hex = format(int(raw), "08X")
+        except ValueError:
+            rfid_hex = raw.upper()
+        results.append(rfid_hex)
+    return results
+
+
+@admin_bp.get("/members")
+def members():
+    if redir := _require_admin():
+        return redir
+    all_members = Member.query.order_by(Member.name).all()
+    return render_template("admin/members.html", members=all_members)
+
+
+@admin_bp.post("/members/import")
+def members_import():
+    if redir := _require_admin():
+        return redir
+    f = request.files.get("excel_file")
+    if not f or not f.filename:
+        flash("Keine Datei ausgewählt.")
+        return redirect(url_for("admin.members"))
+    try:
+        rows = _parse_rfid_excel(f.stream)
+    except Exception as exc:
+        flash(f"Fehler beim Lesen der Datei: {exc}")
+        return redirect(url_for("admin.members"))
+
+    added = skipped = 0
+    for rfid_hex in rows:
+        if Member.query.filter_by(rfid_uid=rfid_hex).first():
+            skipped += 1
+            continue
+        db.session.add(Member(name=rfid_hex, rfid_uid=rfid_hex))
+        added += 1
+    db.session.commit()
+    flash(f"{added} importiert, {skipped} bereits vorhanden.")
+    return redirect(url_for("admin.members"))
+
+
+@admin_bp.post("/members/<int:member_id>/topup")
+def members_topup(member_id):
+    if redir := _require_admin():
+        return redir
+    member = Member.query.get_or_404(member_id)
+    try:
+        amount_cents = int(float(request.form["amount"]) * 100)
+    except (KeyError, ValueError):
+        flash("Ungültiger Betrag.")
+        return redirect(url_for("admin.members"))
+    member.balance_cents += amount_cents
+    db.session.commit()
+    flash(f"Guthaben von {member.name} aufgeladen.")
+    return redirect(url_for("admin.members"))
+
+
+@admin_bp.post("/members/<int:member_id>/delete")
+def members_delete(member_id):
+    if redir := _require_admin():
+        return redir
+    member = Member.query.get_or_404(member_id)
+    member.active = False
+    db.session.commit()
+    flash(f"{member.name} deaktiviert.")
+    return redirect(url_for("admin.members"))
+
 
 # ------------------------------------------------------------------
 # Analytics

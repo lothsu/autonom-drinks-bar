@@ -4,3 +4,4 @@ apscheduler>=3.10
 python-dotenv>=1.0
 pyserial>=3.5
 requests>=2.31
+openpyxl>=3.1

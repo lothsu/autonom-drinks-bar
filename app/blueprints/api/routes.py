@@ -75,7 +75,7 @@ def checkout():
 
     member = Member.query.filter_by(rfid_uid=rfid_uid, active=True).first()
     if not member:
-        print(f"[RFID] Unbekannte Karte: {rfid_uid}")
+        return _err("Karte nicht berechtigt", 403)
 
     # build items, calculate total
     items = []
