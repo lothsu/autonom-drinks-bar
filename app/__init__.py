@@ -3,11 +3,13 @@ from dotenv import load_dotenv
 
 from config import config
 from app.extensions import db
+from app.services.allowlist import AllowlistService
 from app.services.rfid import RFIDService
 from app.services.sync import SyncService
 
 load_dotenv()
 
+allowlist_service: AllowlistService | None = None
 rfid_service: RFIDService | None = None
 sync_service: SyncService | None = None
 
@@ -32,7 +34,7 @@ def create_app(env: str = "default") -> Flask:
 
     app.register_blueprint(kiosk_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
-    app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(api_bp, url_prefix="/api/v1/casino")
 
     @app.template_filter("uid_fmt")
     def uid_fmt(uid: str) -> str:
@@ -60,6 +62,10 @@ def create_app(env: str = "default") -> Flask:
 
         sync_service = SyncService(app)
         sync_service.start(interval=app.config["SYNC_INTERVAL_SECONDS"])
+
+        if app.config.get("SYNC_PROVIDER") == "cloud":
+            allowlist_service = AllowlistService(app)
+            allowlist_service.start(interval=300)
 
     return app
 

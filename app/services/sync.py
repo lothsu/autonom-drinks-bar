@@ -93,6 +93,42 @@ class CloudProvider(BaseSyncProvider):
                 return f"CLOUD_URL must use HTTPS in production (got: {url!r})"
         return None
 
+    def fetch_rfid_allowlist(self) -> list[str] | None:
+        """
+        Fetch the current RFID allowlist from the cloud.
+        Returns a list of hex UID strings, or None on failure.
+        """
+        try:
+            import requests as _requests
+        except ImportError:
+            return None
+
+        url, api_key, bar_uid = self._settings()
+        err = self._check_url(url)
+        if err or not api_key or not bar_uid:
+            return None
+
+        headers = _sign_request(api_key, bar_uid, b"")
+        try:
+            resp = _requests.get(
+                f"{url}/rfid-allowlist",
+                headers=headers,
+                timeout=10,
+            )
+        except Exception as exc:
+            print(f"[Allowlist] Request failed: {exc}")
+            return None
+
+        if resp.status_code != 200:
+            print(f"[Allowlist] HTTP {resp.status_code}: {resp.text[:200]}")
+            return None
+
+        try:
+            return resp.json().get("rfid_ids", [])
+        except Exception as exc:
+            print(f"[Allowlist] Failed to parse response: {exc}")
+            return None
+
     def send_heartbeat(self):
         try:
             import requests as _requests

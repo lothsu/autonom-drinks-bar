@@ -12,6 +12,15 @@ def _err(msg, code=400):
 
 
 # ------------------------------------------------------------------
+# Health
+# ------------------------------------------------------------------
+
+@api_bp.get("/health")
+def health():
+    return jsonify({"ok": True})
+
+
+# ------------------------------------------------------------------
 # Drinks
 # ------------------------------------------------------------------
 
@@ -72,6 +81,10 @@ def checkout():
         return _err("rfid_uid required")
     if not cart:
         return _err("cart is empty")
+
+    from app import allowlist_service
+    if allowlist_service is not None and not allowlist_service.is_allowed(rfid_uid):
+        return _err("Karte nicht berechtigt", 403)
 
     member = Member.query.filter_by(rfid_uid=rfid_uid, active=True).first()
     if not member:
