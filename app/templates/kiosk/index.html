@@ -43,6 +43,12 @@
     #modal-status { font-size: 1rem; color: var(--text-lo); margin-bottom: 1.5rem; min-height: 2rem; }
     #modal-cancel { background: var(--muted); color: var(--text); border: none; border-radius: 8px; padding: 0.8rem 2rem; font-size: 1rem; cursor: pointer; }
 
+    /* Blocked card overlay */
+    #blocked-overlay { display: none; position: fixed; inset: 0; background: #c0392b; justify-content: center; align-items: center; z-index: 100; flex-direction: column; gap: 1rem; }
+    #blocked-overlay.show { display: flex; }
+    #blocked-overlay .blocked-icon { font-size: 6rem; line-height: 1; }
+    #blocked-overlay .blocked-text { font-size: 2.4rem; font-weight: bold; color: #fff; text-align: center; padding: 0 2rem; }
+
     /* History button */
     #history-btn { background: var(--muted); color: var(--text); border: none; border-radius: 12px; padding: 1.4rem 1.8rem; font-size: 1rem; cursor: pointer; align-self: stretch; }
 
@@ -127,6 +133,12 @@
   </div>
 </div>
 
+<!-- Blocked card overlay -->
+<div id="blocked-overlay">
+  <div class="blocked-icon">🚫</div>
+  <div class="blocked-text">Karte nicht berechtigt</div>
+</div>
+
 <!-- RFID modal -->
 <div id="modal">
   <div id="modal-box">
@@ -206,11 +218,19 @@
         clearCart();
       }, 1500);
     } else {
-      document.getElementById('modal-status').textContent = '✗ ' + result.error;
-      setTimeout(() => {
-        document.getElementById('modal').classList.remove('show');
-        fetch('/api/rfid/clear', { method: 'POST' });
-      }, 1500);
+      document.getElementById('modal').classList.remove('show');
+      fetch('/api/rfid/clear', { method: 'POST' });
+      if (resp.status === 403) {
+        const overlay = document.getElementById('blocked-overlay');
+        overlay.classList.add('show');
+        setTimeout(() => overlay.classList.remove('show'), 3000);
+      } else {
+        document.getElementById('modal-status').textContent = '✗ ' + result.error;
+        document.getElementById('modal').classList.add('show');
+        setTimeout(() => {
+          document.getElementById('modal').classList.remove('show');
+        }, 3000);
+      }
     }
   }
 
