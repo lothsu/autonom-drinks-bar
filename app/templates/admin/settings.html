@@ -33,6 +33,19 @@
              placeholder="z. B. 11111111-1111-1111-1111-111111111111">
     </div>
 
+    <div class="form-group" style="margin-bottom: 1.4rem;">
+      <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal;">
+        <input type="checkbox" id="RFID_ALLOWLIST_CLOUD" name="RFID_ALLOWLIST_CLOUD"
+               {% if allowlist_cloud %}checked{% endif %}>
+        RFID-Karten über Cloud freigeben
+      </label>
+      <p style="font-size: 0.85rem; color: #888; margin: 0.3rem 0 0 1.7rem;">
+        Standardmäßig aus: Karten werden lokal freigegeben (importierte Mitglieder).
+        Wenn aktiviert, wird die Freigabeliste alle 5 Minuten von der Cloud abgerufen
+        ({{ allowlist_status.count | default(0) }} Karten geladen{% if allowlist_status.updated_at %}, zuletzt aktualisiert {{ allowlist_status.updated_at[:19]|replace("T", " ") }} UTC{% endif %}).
+      </p>
+    </div>
+
     <div style="display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center;">
       <button type="submit" class="btn btn-primary">Speichern</button>
       <button type="button" onclick="testConnection()" class="btn btn-secondary">

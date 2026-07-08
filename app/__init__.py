@@ -15,7 +15,7 @@ sync_service: SyncService | None = None
 
 
 def create_app(env: str = "default") -> Flask:
-    global rfid_service, sync_service
+    global rfid_service, sync_service, allowlist_service
 
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config[env])
@@ -63,9 +63,8 @@ def create_app(env: str = "default") -> Flask:
         sync_service = SyncService(app)
         sync_service.start(interval=app.config["SYNC_INTERVAL_SECONDS"])
 
-        if app.config.get("SYNC_PROVIDER") == "cloud":
-            allowlist_service = AllowlistService(app)
-            allowlist_service.start(interval=300)
+        allowlist_service = AllowlistService(app)
+        allowlist_service.start(interval=300)
 
     return app
 

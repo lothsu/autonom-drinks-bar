@@ -319,15 +319,18 @@ _SETTING_KEYS = ["CLOUD_URL", "CLOUD_API_KEY", "BAR_UID"]
 def settings():
     if redir := _require_admin():
         return redir
-    from app import sync_service
+    from app import sync_service, allowlist_service
     values = {k: Setting.get(k, current_app.config.get(k, "")) for k in _SETTING_KEYS}
     unsynced = Transaction.query.filter_by(synced=False).count()
     status = sync_service.status() if sync_service else {}
+    allowlist_status = allowlist_service.status() if allowlist_service else {}
     return render_template(
         "admin/settings.html",
         values=values,
         unsynced=unsynced,
         sync_status=status,
+        allowlist_cloud=Setting.get("RFID_ALLOWLIST_CLOUD", "0") == "1",
+        allowlist_status=allowlist_status,
     )
 
 
@@ -338,6 +341,7 @@ def settings_save():
     for key in _SETTING_KEYS:
         val = request.form.get(key, "").strip()
         Setting.set(key, val)
+    Setting.set("RFID_ALLOWLIST_CLOUD", "1" if request.form.get("RFID_ALLOWLIST_CLOUD") else "0")
     flash("Einstellungen gespeichert.")
     return redirect(url_for("admin.settings"))
 

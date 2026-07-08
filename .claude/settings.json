@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(WERKZEUG_RUN_MAIN=true python -c ' *)"
+    ]
+  }
+}
