@@ -34,7 +34,7 @@ def create_app(env: str = "default") -> Flask:
 
     app.register_blueprint(kiosk_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
-    app.register_blueprint(api_bp, url_prefix="/api/v1/casino")
+    app.register_blueprint(api_bp, url_prefix="/api")
 
     @app.template_filter("uid_fmt")
     def uid_fmt(uid: str) -> str:

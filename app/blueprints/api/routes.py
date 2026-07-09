@@ -108,9 +108,6 @@ def checkout():
             "line_total_cents": line_total,
         })
 
-    if member and member.balance_cents < total_cents:
-        return _err("Guthaben nicht ausreichend", 402)
-
     if member:
         member.balance_cents -= total_cents
 
@@ -214,8 +211,6 @@ def update_transaction(tx_id):
     # Adjust member balance if the card belongs to a registered member
     member = Member.query.filter_by(rfid_uid=rfid_uid, active=True).first()
     if member:
-        if diff_cents > 0 and member.balance_cents < diff_cents:
-            return _err("Guthaben nicht ausreichend", 402)
         member.balance_cents -= diff_cents
 
     db.session.commit()
