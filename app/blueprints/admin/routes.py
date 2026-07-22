@@ -76,6 +76,7 @@ def drinks_create():
         name=request.form["name"],
         price_cents=int(float(request.form["price"]) * 100),
         position=Drink.query.count(),
+        color=request.form.get("color") or "#1f1f1f",
     )
     db.session.add(drink)
     db.session.commit()
@@ -91,6 +92,7 @@ def drinks_edit(drink_id):
     drink.price_cents = int(float(request.form["price"]) * 100)
     drink.available = "available" in request.form
     drink.position = int(request.form.get("position", drink.position))
+    drink.color = request.form.get("color") or drink.color
     db.session.commit()
     return redirect(url_for("admin.drinks"))
 
@@ -222,6 +224,17 @@ def members_delete(member_id):
     return redirect(url_for("admin.members"))
 
 
+@admin_bp.post("/members/<int:member_id>/reactivate")
+def members_reactivate(member_id):
+    if redir := _require_admin():
+        return redir
+    member = Member.query.get_or_404(member_id)
+    member.active = True
+    db.session.commit()
+    flash(f"{member.name} reaktiviert.")
+    return redirect(url_for("admin.members"))
+
+
 # ------------------------------------------------------------------
 # Analytics
 # ------------------------------------------------------------------
@@ -250,6 +263,17 @@ def analytics():
     transactions = Transaction.query.order_by(Transaction.created_at.desc()).limit(100).all()
     _, uid_rows = _uid_stats()
     return render_template("admin/analytics.html", transactions=transactions, uid_rows=uid_rows)
+
+
+@admin_bp.post("/transactions/<int:tx_id>/delete")
+def transactions_delete(tx_id):
+    if redir := _require_admin():
+        return redir
+    tx = Transaction.query.get_or_404(tx_id)
+    db.session.delete(tx)
+    db.session.commit()
+    flash(f"Buchung #{tx_id} gelöscht.")
+    return redirect(url_for("admin.analytics"))
 
 
 @admin_bp.get("/charts")

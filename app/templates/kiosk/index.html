@@ -49,6 +49,22 @@
     #blocked-overlay .blocked-icon { font-size: 6rem; line-height: 1; }
     #blocked-overlay .blocked-text { font-size: 2.4rem; font-weight: bold; color: #fff; text-align: center; padding: 0 2rem; }
 
+    /* Success flash overlay */
+    #success-flash { display: none; position: fixed; inset: 0; background: #2ecc71; justify-content: center; align-items: center; z-index: 100; pointer-events: none; }
+    #success-flash.show { display: flex; animation: success-flash-anim 0.6s ease-out; }
+    #success-flash .success-icon { font-size: 7rem; line-height: 1; color: #fff; animation: success-icon-pop 0.6s ease-out; }
+    @keyframes success-flash-anim {
+      0%   { opacity: 0; }
+      15%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    @keyframes success-icon-pop {
+      0%   { transform: scale(0.4); opacity: 0; }
+      30%  { transform: scale(1.15); opacity: 1; }
+      50%  { transform: scale(1); }
+      100% { transform: scale(1); opacity: 0; }
+    }
+
     /* History button */
     #history-btn { background: var(--muted); color: var(--text); border: none; border-radius: 12px; padding: 1.4rem 1.8rem; font-size: 1rem; cursor: pointer; align-self: stretch; }
 
@@ -91,7 +107,7 @@
 
 <div id="drinks-grid">
   {% for drink in drinks %}
-  <div class="drink-btn" data-id="{{ drink.id }}" data-price="{{ drink.price_cents }}" data-name="{{ drink.name }}" onclick="addToCart(this)">
+  <div class="drink-btn" data-id="{{ drink.id }}" data-price="{{ drink.price_cents }}" data-name="{{ drink.name }}" onclick="addToCart(this)" style="background: {{ drink.color }};">
     <div class="name">{{ drink.name }}</div>
     <div class="price">€{{ "%.2f"|format(drink.price_cents / 100) }}</div>
     <div class="qty-badge" style="display:none">0</div>
@@ -139,6 +155,11 @@
   <div class="blocked-text">Karte nicht berechtigt</div>
 </div>
 
+<!-- Success flash overlay -->
+<div id="success-flash">
+  <div class="success-icon">✓</div>
+</div>
+
 <!-- RFID modal -->
 <div id="modal">
   <div id="modal-box">
@@ -151,6 +172,36 @@
 <script>
   const cart = {};  // { drink_id: { name, price_cents, qty } }
   let polling = null;
+
+  // Short two-tone "ding" synthesized on demand (no static audio file needed).
+  let _audioCtx = null;
+  function playDing() {
+    try {
+      _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const now = _audioCtx.currentTime;
+      [[880, 0], [1318.5, 0.12]].forEach(([freq, delay]) => {
+        const osc = _audioCtx.createOscillator();
+        const gain = _audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now + delay);
+        gain.gain.linearRampToValueAtTime(0.3, now + delay + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.35);
+        osc.connect(gain).connect(_audioCtx.destination);
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.4);
+      });
+    } catch (_) {}
+  }
+
+  function playSuccessFeedback() {
+    playDing();
+    const flash = document.getElementById('success-flash');
+    flash.classList.remove('show');
+    void flash.offsetWidth; // restart CSS animation
+    flash.classList.add('show');
+    setTimeout(() => flash.classList.remove('show'), 600);
+  }
 
   function addToCart(el) {
     const id = el.dataset.id;
@@ -213,6 +264,7 @@
         : ' — Karte nicht registriert';
       document.getElementById('modal-status').textContent =
         `✓ €${result.total.toFixed(2)} gebucht${balanceStr}`;
+      playSuccessFeedback();
       setTimeout(() => {
         document.getElementById('modal').classList.remove('show');
         clearCart();
@@ -391,7 +443,8 @@
   // Reload page if drinks change in admin (new drink, price change, removal)
   const _drinksKey = {{ drinks | map(attribute='id') | list | tojson }}.join(':')
     + '|' + {{ drinks | map(attribute='name') | list | tojson }}.join(':')
-    + '|' + {{ drinks | map(attribute='price_cents') | list | tojson }}.join(':');
+    + '|' + {{ drinks | map(attribute='price_cents') | list | tojson }}.join(':')
+    + '|' + {{ drinks | map(attribute='color') | list | tojson }}.join(':');
 
   setInterval(async () => {
     try {
@@ -399,7 +452,8 @@
       const data = await res.json();
       const key = data.map(d => d.id).join(':')
         + '|' + data.map(d => d.name).join(':')
-        + '|' + data.map(d => d.price_cents).join(':');
+        + '|' + data.map(d => d.price_cents).join(':')
+        + '|' + data.map(d => d.color).join(':');
       if (key !== _drinksKey) location.reload();
     } catch (_) {}
   }, 5000);

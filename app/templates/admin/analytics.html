@@ -25,7 +25,7 @@
 <div class="card">
   <table>
     <thead>
-      <tr><th>ID</th><th>Zeitpunkt</th><th>UID</th><th>Artikel</th><th>Gesamt</th><th>Sync</th></tr>
+      <tr><th>ID</th><th>Zeitpunkt</th><th>UID</th><th>Artikel</th><th>Gesamt</th><th>Sync</th><th></th></tr>
     </thead>
     <tbody>
     {% for tx in transactions %}
@@ -40,9 +40,24 @@
       </td>
       <td>€{{ "%.2f"|format(tx.total_cents / 100) }}</td>
       <td>{{ "✓" if tx.synced else "…" }}</td>
+      <td>
+        <form method="post" action="{{ url_for('admin.transactions_delete', tx_id=tx.id) }}"
+              onsubmit="return confirm('Buchung #{{ tx.id }} über €{{ "%.2f"|format(tx.total_cents / 100) }} löschen? Das Guthaben wird nicht zurückgebucht.')">
+          <button class="btn-delete" type="submit" title="Delete">&#10005;</button>
+        </form>
+      </td>
     </tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
+
+<style>
+  .btn-delete {
+    background: none; border: none; cursor: pointer;
+    color: #ccc; font-size: 1rem; padding: 0.2rem 0.4rem;
+    border-radius: 6px; transition: color 0.15s, background 0.15s;
+  }
+  .btn-delete:hover { color: #fff; background: #e94560; }
+</style>
 {% endblock %}

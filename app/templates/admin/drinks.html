@@ -8,6 +8,7 @@
   <form method="post" style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
     <input name="name" placeholder="Name" required>
     <input name="price" type="number" step="0.01" min="0" placeholder="Preis (€)" required style="width:130px">
+    <input class="field-color" name="color" type="color" value="#1f1f1f" title="Farbe">
     <button class="btn btn-primary" type="submit">Hinzufügen</button>
   </form>
 </div>
@@ -27,6 +28,8 @@
         <input class="field-price" name="price" type="number" step="0.01" min="0"
                value="{{ "%.2f"|format(d.price_cents / 100) }}">
       </div>
+
+      <input class="field-color" name="color" type="color" value="{{ d.color }}" title="Farbe">
 
       <label class="toggle" title="Available">
         <input type="checkbox" name="available" {% if d.available %}checked{% endif %}>
@@ -81,6 +84,14 @@
   .field-price:hover, .field-price:focus {
     border-color: #ccc; background: #fff; outline: none;
   }
+
+  .field-color {
+    width: 34px; height: 34px; padding: 2px; flex-shrink: 0;
+    border: 1px solid #ddd; border-radius: 6px; background: transparent;
+    cursor: pointer;
+  }
+  .field-color::-webkit-color-swatch-wrapper { padding: 0; }
+  .field-color::-webkit-color-swatch { border: none; border-radius: 4px; }
 
   /* Toggle switch */
   .toggle { display: flex; align-items: center; cursor: pointer; flex-shrink: 0; }

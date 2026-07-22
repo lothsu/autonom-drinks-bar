@@ -28,6 +28,10 @@
         <form method="post" action="{{ url_for('admin.members_delete', member_id=m.id) }}" onsubmit="return confirm('RFID deaktivieren?')">
           <button class="btn btn-sm" style="background:#f44;color:#fff">Deaktivieren</button>
         </form>
+        {% else %}
+        <form method="post" action="{{ url_for('admin.members_reactivate', member_id=m.id) }}" onsubmit="return confirm('RFID reaktivieren?')">
+          <button class="btn btn-sm" style="background:#4caf50;color:#fff">Reaktivieren</button>
+        </form>
         {% endif %}
       </td>
     </tr>

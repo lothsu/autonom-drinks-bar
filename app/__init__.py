@@ -73,6 +73,14 @@ def _migrate_db():
     """Apply schema migrations that db.create_all() cannot handle on existing tables."""
     from sqlalchemy import text, inspect as sa_inspect
     inspector = sa_inspect(db.engine)
+
+    if "drinks" in inspector.get_table_names():
+        drink_cols = [c["name"] for c in inspector.get_columns("drinks")]
+        if "color" not in drink_cols:
+            with db.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE drinks ADD COLUMN color TEXT NOT NULL DEFAULT '#1f1f1f'"))
+            print("[DB] Migrated drinks table (added color column)")
+
     if "transactions" not in inspector.get_table_names():
         return  # fresh DB — create_all already created the correct schema
 

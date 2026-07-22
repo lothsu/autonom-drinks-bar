@@ -10,6 +10,7 @@ class Drink(db.Model):
     price_cents = db.Column(db.Integer, nullable=False)  # stored in cents
     available = db.Column(db.Boolean, default=True, nullable=False)
     position = db.Column(db.Integer, default=0, nullable=False)
+    color = db.Column(db.String(7), nullable=False, default="#1f1f1f")
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
@@ -20,4 +21,5 @@ class Drink(db.Model):
             "price": self.price_cents / 100,
             "available": self.available,
             "position": self.position,
+            "color": self.color,
         }
